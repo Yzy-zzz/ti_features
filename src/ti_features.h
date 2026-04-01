@@ -79,7 +79,7 @@ extern "C" {
 // 插件入口函数
 UCHAR TI_FEATURES_UDP_ENTRY(struct streaminfo *a_stream, void **pme, int thread_seq, void *a_packet);
 UCHAR TI_FEATURES_TCP_ENTRY(struct streaminfo *a_stream, void **pme, int thread_seq, void *a_packet);
-// UCHAR TI_FEATURES_SSL_ENTRY(stSessionInfo *session_info, void **pme, int thread_seq, struct streaminfo *a_stream, void *a_packet);
+UCHAR TI_FEATURES_SSL_ENTRY(stSessionInfo *session_info, void **pme, int thread_seq, struct streaminfo *a_stream, void *a_packet);
 // UCHAR TI_FEATURES_QUIC_ENTRY(stSessionInfo *session_info, void **pme, int thread_seq, struct streaminfo *a_stream, void *a_packet);
 int TI_FEATURES_INIT(void);
 void TI_FEATURES_DESTROY(void);

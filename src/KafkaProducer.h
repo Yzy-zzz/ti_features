@@ -34,6 +34,8 @@ public:
 
 	int MessageInQueue();
 
+	int Flush(int timeout_ms);
+
 	void KafkaPoll(int interval);
 	rd_kafka_topic_t* CreateTopicHandle(const string& topicName);
 

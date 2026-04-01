@@ -76,7 +76,7 @@ ti_features/
 
 | 模块 | 文件 | 职责 |
 |------|------|------|
-| **配置模块** | feature_config.h/cpp | 读取配置文件，管理全局参数 |
+| **配置模块** | feature_config.h/cpp | 读取配置文件，管理全局参数，Bridge 初始化与回调注册 |
 | **状态模块** | feat_state.h | 定义每流状态结构体 |
 | **统计工具** | feature_stats.h | Welford 在线统计算法、Bigram 统计 |
 | **基础特征** | calc_basic.h/cpp | 包数、字节数、包长统计 |
@@ -414,6 +414,86 @@ typedef struct {
 
 ---
 
+## Bridge 数据桥接
+
+插件支持通过 `stream_bridge` 机制将特征 JSON 数据传递给其他插件，实现插件间的数据共享。
+
+### 工作原理
+
+```
+流关闭 (OP_STATE_CLOSE)
+    │
+    ▼
+cJSON_PrintUnformatted() → out (JSON 字符串)
+    │
+    ├─→ Kafka 发送 (send_kafka_flag=1)
+    │
+    ├─→ 日志输出 (output_to_log=1)
+    │
+    └─→ Bridge 输出 (feature_bridge_flag=1)
+            │
+            ▼
+        strdup(out) → bridge_data (复制一份)
+            │
+            ▼
+        stream_bridge_async_data_put(stream, bridge_id, bridge_data)
+            │
+            ▼
+        其他插件通过 stream_bridge_async_data_get() 获取
+            │
+            ▼
+        streaminfo 关闭时自动调用 free 回调释放内存
+```
+
+### 数据流程图
+
+```
+            -------------------
+            |   streaminfo    |   插件 X
+            |-----------------| /
+   ti_features              |bridge → JSON|/--插件 Y
+            |-----------------|\
+            |     ...         | \ 插件 Z
+            -------------------
+```
+
+### 配置说明
+
+在配置文件中启用 bridge：
+
+```ini
+[BRIDGE]
+feature_bridge_flag = 1              # 0=禁用，1=启用
+feature_bridge_name = FEATURE_BRIDGE   # bridge 名称（其他插件需使用相同名称）
+```
+
+### 其他插件获取数据示例
+
+```c
+// 接收端插件初始化
+int bridge_id = stream_bridge_build("FEATURE_BRIDGE", "r");
+
+// 在流处理过程中获取特征 JSON
+char* feature_json = (char*)stream_bridge_async_data_get(stream, bridge_id);
+if (feature_json == NULL) {
+    if (errno == ENODATA) {
+        // 没有数据
+    }
+} else {
+    // 解析 JSON 并使用特征数据
+    cJSON* json = cJSON_Parse(feature_json);
+    // ...
+}
+```
+
+### 内存管理
+
+- 发送端使用 `strdup()` 复制 JSON 字符串，确保数据独立
+- 注册 `free_feature_bridge_data()` 回调函数，streaminfo 关闭时自动释放
+- 避免内存泄漏和悬空指针问题
+
+---
+
 ## 处理流程
 
 ```
@@ -444,7 +524,10 @@ typedef struct {
                 ├── 计算复杂度
                 ├── 计算 Hurst 指数
                 ├── 计算所有派生特征
-                └── 生成输出 JSON / 发送 Kafka
+                ├── 生成 JSON 输出
+                ├── 发送 Kafka (可选)
+                ├── 输出到日志 (可选)
+                └── Bridge 数据桥接 (可选)
 ```
 
 ---
@@ -504,12 +587,16 @@ bulk_transfer_kbps = 10          # 大流量传输阈值
 short_conn_threshold_s = 2       # 短连接阈值
 
 # =============================================================================
-# SNI 配置
+# BRIDGE 配置（数据桥接）
 # =============================================================================
-[SNI]
-filter_sni_flag = 0              # 0=不过滤，1=过滤，2=仅 443
-filter_sni = googlevideo.com
-sni_bridge_name = TLS_QUIC_SNI
+[BRIDGE]
+# 是否启用数据桥接 (0=禁用，1=启用)
+# 启用后，特征 JSON 会通过 stream_bridge 传递给其他插件
+feature_bridge_flag = 0
+
+# Bridge 名称标识符
+# 其他插件需要使用相同名称调用 stream_bridge_build() 来获取数据
+feature_bridge_name = FEATURE_BRIDGE
 
 # =============================================================================
 # KAFKA 配置
@@ -599,7 +686,7 @@ kiss_fft_free(cfg);
 
 ## 依赖
 
-- MESA 框架（stream.h, cJSON.h 等）
+- MESA 框架（stream.h, cJSON.h, stream_bridge.h 等）
 - librdkafka（Kafka 输出）
 - pthread
 
@@ -610,3 +697,4 @@ kiss_fft_free(cfg);
 - 2026-03-26: 特征字段枚举与代码对齐基线
 - 2026-03-27: 内存池分级架构实现
 - 2026-03-30: 文档合并整理
+- 2026-03-31: 添加 Bridge 数据桥接功能，支持插件间特征数据共享

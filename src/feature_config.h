@@ -49,11 +49,16 @@ typedef struct _ti_feature_config
     char topic_name[MAX_DOMAIN_LEN];
     KafkaProducer* kafka_producer;
 
+    // FEATURE 桥接配置
+    short feature_bridge_flag;
+    int feature_bridge_id;
+    char feature_bridge_name[MAX_DOMAIN_LEN];
+
+
     // SNI 桥接配置
-    short filter_sni_flag;
+    short sni_bridge_flag;
     int sni_bridge_id;
     char sni_bridge_name[MAX_DOMAIN_LEN];
-    char filter_sni[MAX_DOMAIN_LEN];
 
     // 输出原始序列标志
     unsigned int output_raw_seq;

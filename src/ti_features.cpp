@@ -647,20 +647,38 @@ UCHAR traffic_process(struct streaminfo *a_stream, void **pme, int thread_seq,
             // 计算所有特征并输出
             cJSON* output = flow_state_compute_features(state, a_stream, thread_seq, a_stream_type);
 
-            if (output && (g_feat_config.send_kafka_flag || g_feat_config.output_to_log)) {
+            if (output && (g_feat_config.send_kafka_flag || g_feat_config.output_to_log || g_feat_config.feature_bridge_flag)) {
                 char* out = cJSON_PrintUnformatted(output);
                 if (out) {
                     if (g_feat_config.send_kafka_flag) {
                         string topic = (string)g_feat_config.topic_name;
-                        if (g_feat_config.kafka_producer->SendData(topic, (void*)out, strlen(out)) != 0) {
+                        int send_ret = g_feat_config.kafka_producer->SendData(topic, (void*)out, strlen(out));
+                        if (send_ret != 0) {
                             MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_FATAL, TI_FEATURES,
-                                "%s Kafka SendData failed", printaddr(&a_stream->addr, thread_seq));
+                                "%s Kafka SendData failed, ret=%d, outq_len=%d",
+                                printaddr(&a_stream->addr, thread_seq),
+                                send_ret,
+                                g_feat_config.kafka_producer->MessageInQueue());
                         }
                     }
 
                     if (g_feat_config.output_to_log) {
                         MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_DEBUG, TI_FEATURES,
                             "%s send_kafka JSON is %s.", printaddr(&a_stream->addr, thread_seq), out);
+                    }
+
+                    // Bridge 输出：复制 JSON 字符串并通过 bridge 传递给其他插件
+                    if (g_feat_config.feature_bridge_flag && g_feat_config.feature_bridge_id >= 0) {
+                        char* bridge_data = strdup(out);  // 复制一份 JSON 字符串
+                        if (bridge_data) {
+                            stream_bridge_async_data_put(a_stream, g_feat_config.feature_bridge_id, bridge_data);
+                            MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_DEBUG, TI_FEATURES,
+                                "%s Feature JSON sent to bridge, id=%d, len=%zu",
+                                printaddr(&a_stream->addr, thread_seq), g_feat_config.feature_bridge_id, strlen(bridge_data));
+                        } else {
+                            MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_FATAL, TI_FEATURES,
+                                "%s Failed to duplicate JSON for bridge", printaddr(&a_stream->addr, thread_seq));
+                        }
                     }
 
                     cJSON_free(out);
@@ -743,6 +761,14 @@ cJSON* flow_state_compute_features(flow_feature_state_t* state,
     if (!output) return NULL;
 
     add_flow_tuple_identifier(output, a_stream, a_stream_type);
+
+    // 从 bridge 获取 SNI（如果配置了 sni_bridge_flag）
+    if (g_feat_config.sni_bridge_flag && g_feat_config.sni_bridge_id >= 0) {
+        char* sni = (char*)stream_bridge_async_data_get(a_stream, g_feat_config.sni_bridge_id);
+        if (sni != NULL) {
+            cJSON_AddStringToObject(output, "SNI", sni);
+        }
+    }
 
     // 基础特征
     calc_derived_basic(state, output);
@@ -830,42 +856,30 @@ UCHAR TI_FEATURES_UDP_ENTRY(struct streaminfo *a_stream, void **pme, int thread_
     return traffic_process(a_stream, pme, thread_seq, a_packet, UDP);
 }
 
+UCHAR TI_FEATURES_SSL_ENTRY(stSessionInfo *session_info, void **pme, int thread_seq,
+                            struct streaminfo *a_stream, void *a_packet)
+{
+    ssl_stream* a_ssl_stream = (ssl_stream*)session_info->app_info;
+    char* sni = NULL;
+    int len = 0;
 
+    switch(session_info->prot_flag)
+    {
+    case SSL_CLIENT_HELLO:
+        // 提取 SNI 并放入 bridge
+        if(a_ssl_stream->stClientHello && strlen((const char*)(a_ssl_stream->stClientHello->server_name)) > 0)
+        {
+            sni = (char*)malloc(sizeof(char)*MAX_DOMAIN_LEN);
+            memset(sni, 0, sizeof(char)*MAX_DOMAIN_LEN);
+            len = (int)MIN(strlen((const char*)(a_ssl_stream->stClientHello->server_name)), sizeof(char)*MAX_DOMAIN_LEN);
+            memcpy(sni, a_ssl_stream->stClientHello->server_name, len);
+            stream_bridge_async_data_put(a_stream, g_feat_config.sni_bridge_id, sni);
+        }
+        break;
+    default:
+        break;
+    }
 
-// UCHAR TI_FEATURES_SSL_ENTRY(stSessionInfo *session_info, void **pme, int thread_seq,
-//                             struct streaminfo *a_stream, void *a_packet)
-// {
-//     // SSL 处理：提取 SNI 等信息
-//     ssl_stream* a_ssl_stream = (ssl_stream*)session_info->app_info;
-
-//     if (session_info->prot_flag & SSL_CLIENT_HELLO) {
-//         if (a_ssl_stream->stClientHello && strlen((char*)a_ssl_stream->stClientHello->server_name) > 0) {
-//             char* sni = (char*)malloc(MAX_DOMAIN_LEN);
-//             memset(sni, 0, MAX_DOMAIN_LEN);
-//             memcpy(sni, a_ssl_stream->stClientHello->server_name,
-//                    MIN(strlen((char*)a_ssl_stream->stClientHello->server_name), MAX_DOMAIN_LEN - 1));
-//             stream_bridge_async_data_put(a_stream, g_feat_config.sni_bridge_id, sni);
-//         }
-//     }
-
-//     return PROT_STATE_GIVEME;
-// }
-
-// UCHAR TI_FEATURES_QUIC_ENTRY(stSessionInfo *session_info, void **pme, int thread_seq,
-//                              struct streaminfo *a_stream, void *a_packet)
-// {
-//     struct quic_info *quic_info = (struct quic_info *)session_info->app_info;
-
-//     if (session_info->prot_flag & QUIC_CLIENT_HELLO) {
-//         if (quic_info->client_hello && quic_info->client_hello->sni) {
-//             char* sni = (char*)malloc(MAX_DOMAIN_LEN);
-//             memset(sni, 0, MAX_DOMAIN_LEN);
-//             memcpy(sni, quic_info->client_hello->sni,
-//                    MIN(strlen(quic_info->client_hello->sni), MAX_DOMAIN_LEN - 1));
-//             stream_bridge_async_data_put(a_stream, g_feat_config.sni_bridge_id, sni);
-//         }
-//     }
-
-//     return PROT_STATE_GIVEME;
-// }
+    return PROT_STATE_GIVEME;
+}
 
