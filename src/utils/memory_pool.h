@@ -316,6 +316,9 @@ static inline void* flow_mem_pool_alloc_temp(flow_mem_pool_t* pool, size_t size,
 {
     if (!pool || size == 0) return NULL;
 
+    // 请求超过临时区容量时直接失败，避免返回可用指针后发生越界写。
+    if (size > pool->temp_mem_size) return NULL;
+
     // 对齐 offset
     size_t offset = pool->temp_mem_offset;
     if (alignment > 1) {

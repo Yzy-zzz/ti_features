@@ -117,6 +117,32 @@ static inline int ring_buffer_rebind_from_snapshot(circular_buffer_t* cb,
     return 0;
 }
 
+static inline void flow_state_bind_temp_buffers(flow_feature_state_t* state, unsigned int seq_len)
+{
+    if (!state || !state->mem_pool) return;
+
+    size_t bytes_per_double_pair = 2 * sizeof(double);
+    unsigned int temp_cap = (unsigned int)(state->mem_pool->temp_mem_size / bytes_per_double_pair);
+    unsigned int bounded_len = (seq_len < temp_cap) ? seq_len : temp_cap;
+
+    state->temp_double_buffer = NULL;
+    state->temp_double_buffer_2 = NULL;
+    state->temp_uint_buffer_size = 0;
+
+    if (bounded_len == 0) {
+        return;
+    }
+
+    state->temp_double_buffer = (double*)flow_mem_pool_alloc_temp(
+        state->mem_pool, (size_t)bounded_len * bytes_per_double_pair, 8);
+    if (!state->temp_double_buffer) {
+        return;
+    }
+
+    state->temp_uint_buffer_size = bounded_len;
+    state->temp_double_buffer_2 = state->temp_double_buffer + bounded_len;
+}
+
 int flow_state_init(flow_feature_state_t* state)
 {
     if (!state) return -1;
@@ -177,10 +203,7 @@ int flow_state_init(flow_feature_state_t* state)
 
     // 设置临时 buffer 指针（用于特征计算时复用）
     seq_len = state->mem_pool->actual_seq_len;
-    state->temp_double_buffer = (double*)flow_mem_pool_alloc_temp(state->mem_pool,
-        seq_len * sizeof(double) * 2, 8);
-    state->temp_uint_buffer_size = seq_len;
-    state->temp_double_buffer_2 = state->temp_double_buffer + seq_len;
+    flow_state_bind_temp_buffers(state, seq_len);
 
     // 从内存池获取各数组指针
     state->fwd_pkt_lens = state->mem_pool->fwd_pkt_lens;
@@ -507,12 +530,9 @@ UCHAR traffic_process(struct streaminfo *a_stream, void **pme, int thread_seq,
                         state->fwd_payload_capacity = state->mem_pool->actual_seq_len;
                         state->bwd_payload_capacity = state->mem_pool->actual_seq_len;
 
-                        // 重新设置临时 buffer
+                        // 重新设置临时 buffer（按临时区真实容量绑定）
                         unsigned int seq_len = state->mem_pool->actual_seq_len;
-                        state->temp_double_buffer = (double*)flow_mem_pool_alloc_temp(
-                            state->mem_pool, seq_len * sizeof(double) * 2, 8);
-                        state->temp_uint_buffer_size = seq_len;
-                        state->temp_double_buffer_2 = state->temp_double_buffer + seq_len;
+                        flow_state_bind_temp_buffers(state, seq_len);
 
                         // 扩容后重绑定 ring buffer，并恢复历史序列
                         size_t ring_offset = 0;
@@ -859,6 +879,14 @@ UCHAR TI_FEATURES_UDP_ENTRY(struct streaminfo *a_stream, void **pme, int thread_
 UCHAR TI_FEATURES_SSL_ENTRY(stSessionInfo *session_info, void **pme, int thread_seq,
                             struct streaminfo *a_stream, void *a_packet)
 {
+    (void)pme;
+    (void)thread_seq;
+    (void)a_packet;
+
+    if (!session_info || !a_stream) {
+        return PROT_STATE_GIVEME;
+    }
+
     ssl_stream* a_ssl_stream = (ssl_stream*)session_info->app_info;
     char* sni = NULL;
     int len = 0;
@@ -867,13 +895,20 @@ UCHAR TI_FEATURES_SSL_ENTRY(stSessionInfo *session_info, void **pme, int thread_
     {
     case SSL_CLIENT_HELLO:
         // 提取 SNI 并放入 bridge
-        if(a_ssl_stream->stClientHello && strlen((const char*)(a_ssl_stream->stClientHello->server_name)) > 0)
+        if (g_feat_config.sni_bridge_flag && g_feat_config.sni_bridge_id >= 0 &&
+            a_ssl_stream && a_ssl_stream->stClientHello &&
+            strlen((const char*)(a_ssl_stream->stClientHello->server_name)) > 0)
         {
             sni = (char*)malloc(sizeof(char)*MAX_DOMAIN_LEN);
-            memset(sni, 0, sizeof(char)*MAX_DOMAIN_LEN);
-            len = (int)MIN(strlen((const char*)(a_ssl_stream->stClientHello->server_name)), sizeof(char)*MAX_DOMAIN_LEN);
-            memcpy(sni, a_ssl_stream->stClientHello->server_name, len);
-            stream_bridge_async_data_put(a_stream, g_feat_config.sni_bridge_id, sni);
+            if (sni) {
+                memset(sni, 0, sizeof(char)*MAX_DOMAIN_LEN);
+                len = (int)MIN(strlen((const char*)(a_ssl_stream->stClientHello->server_name)), (size_t)(MAX_DOMAIN_LEN - 1));
+                memcpy(sni, a_ssl_stream->stClientHello->server_name, len);
+
+                if (stream_bridge_async_data_put(a_stream, g_feat_config.sni_bridge_id, sni) < 0) {
+                    free(sni);
+                }
+            }
         }
         break;
     default:

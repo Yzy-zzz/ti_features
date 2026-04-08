@@ -388,7 +388,11 @@ void calc_derived_basic(flow_feature_state_t* state, cJSON* output)
     // 小包/大包比例（优化：避免 malloc，直接使用 circular_buffer 内部数据）
     unsigned int small_pkt_count = 0, large_pkt_count = 0;
     unsigned int pkt_count = circular_buffer_count(&state->pkt_len_seq);
-    if (pkt_count > 0) {
+    if (pkt_count > 0 &&
+        state->pkt_len_seq.data != NULL &&
+        state->pkt_len_seq.elem_size == sizeof(unsigned int) &&
+        state->pkt_len_seq.capacity > 0 &&
+        pkt_count <= state->pkt_len_seq.capacity) {
         // 直接遍历 buffer 而不复制
         for (unsigned int i = 0; i < pkt_count; i++) {
             unsigned int* pkt = (unsigned int*)circular_buffer_get(&state->pkt_len_seq, i);
@@ -401,6 +405,9 @@ void calc_derived_basic(flow_feature_state_t* state, cJSON* output)
             (double)small_pkt_count / pkt_count);
         cJSON_AddNumberToObject(output, "large_packet_ratio",
             (double)large_pkt_count / pkt_count);
+    } else {
+        cJSON_AddNumberToObject(output, "small_packet_ratio", 0);
+        cJSON_AddNumberToObject(output, "large_packet_ratio", 0);
     }
 
     // === 方向过滤的包长统计（分位数等） - 使用临时 buffer ===
@@ -486,7 +493,11 @@ void calc_derived_basic(flow_feature_state_t* state, cJSON* output)
 
     // 整体包长分位数（使用临时 buffer）
     unsigned int total_count = circular_buffer_count(&state->pkt_len_seq);
-    if (total_count > 0 && total_count <= max_len) {
+    if (total_count > 0 && total_count <= max_len &&
+        state->pkt_len_seq.data != NULL &&
+        state->pkt_len_seq.elem_size == sizeof(unsigned int) &&
+        state->pkt_len_seq.capacity > 0 &&
+        total_count <= state->pkt_len_seq.capacity) {
         unsigned int* all_sorted = (unsigned int*)temp_buf;
 
         // 从 circular buffer 复制到临时 buffer

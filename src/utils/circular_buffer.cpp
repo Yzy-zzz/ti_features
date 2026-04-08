@@ -41,7 +41,11 @@ void circular_buffer_destroy(circular_buffer_t* cb)
 // 添加元素
 int circular_buffer_push(circular_buffer_t* cb, const void* elem)
 {
-    if (!cb || !elem) {
+    if (!cb || !elem || !cb->data || cb->capacity == 0 || cb->elem_size == 0) {
+        return -1;
+    }
+
+    if (cb->count > cb->capacity) {
         return -1;
     }
 
@@ -66,7 +70,11 @@ int circular_buffer_push(circular_buffer_t* cb, const void* elem)
 // 获取指定索引的元素
 void* circular_buffer_get(circular_buffer_t* cb, unsigned int index)
 {
-    if (!cb || index >= cb->count) {
+    if (!cb || !cb->data || cb->capacity == 0 || cb->elem_size == 0) {
+        return NULL;
+    }
+
+    if (cb->count > cb->capacity || index >= cb->count) {
         return NULL;
     }
 
@@ -90,6 +98,11 @@ void* circular_buffer_get_array(circular_buffer_t* cb, unsigned int* out_count)
     }
 
     *out_count = cb->count;
+
+    // 空序列不分配，避免 malloc(0) 产生不可见小泄漏
+    if (cb->count == 0 || !cb->data || cb->elem_size == 0) {
+        return NULL;
+    }
 
     // 分配新数组并复制数据
     void* arr = malloc(cb->count * cb->elem_size);

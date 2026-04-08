@@ -13,25 +13,27 @@ ti_feature_config_t g_feat_config;
 // ============================================================================
 
 // 用于释放通过 bridge 传递的 JSON 字符串数据
-int free_feature_bridge_data(const struct streaminfo *a_stream, int bridge_id, void *data)
+void free_feature_bridge_data(const struct streaminfo *a_stream, int bridge_id, void *data)
 {
+    (void)a_stream;
+    (void)bridge_id;
     char* json_str = (char*)data;
     if (json_str != NULL) {
         free(json_str);
         json_str = NULL;
     }
-    return 0;
 }
 
 // 用于释放通过 SNI bridge 传递的 SNI 字符串数据
-int free_sni_bridge_data(const struct streaminfo *a_stream, int bridge_id, void *data)
+void free_sni_bridge_data(const struct streaminfo *a_stream, int bridge_id, void *data)
 {
+    (void)a_stream;
+    (void)bridge_id;
     char* sni = (char*)data;
     if (sni != NULL) {
         free(sni);
         sni = NULL;
     }
-    return 0;
 }
 
 // 获取配置实例
@@ -149,7 +151,7 @@ int feat_config_read(const char* filename)
         MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_INFO, TI_FEATURES, "SNI bridge initialized, name=%s, id=%d", g_feat_config.sni_bridge_name, g_feat_config.sni_bridge_id);
 
         // 注册 SNI bridge 数据释放回调函数
-        int ret = stream_bridge_register_data_sync_cb(g_feat_config.sni_bridge_id, free_sni_bridge_data);
+        int ret = stream_bridge_register_data_free_cb(g_feat_config.sni_bridge_id, free_sni_bridge_data);
         if (ret < 0) {
             MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_FATAL, TI_FEATURES, "SNI_BRIDGE register free callback failed, bridge_id=%d!!!", g_feat_config.sni_bridge_id);
             MESA_destroy_runtime_log_handle(g_feat_config.log_handle);
@@ -173,7 +175,7 @@ int feat_config_read(const char* filename)
         MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_INFO, TI_FEATURES, "FEATURE bridge initialized, name=%s, id=%d", g_feat_config.feature_bridge_name, g_feat_config.feature_bridge_id);
 
         // 注册 bridge 数据释放回调函数
-        int ret = stream_bridge_register_data_sync_cb(g_feat_config.feature_bridge_id, free_feature_bridge_data);
+        int ret = stream_bridge_register_data_free_cb(g_feat_config.feature_bridge_id, free_feature_bridge_data);
         if (ret < 0) {
             MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_FATAL, TI_FEATURES, "FEATURE_BRIDGE register free callback failed, bridge_id=%d!!!", g_feat_config.feature_bridge_id);
             MESA_destroy_runtime_log_handle(g_feat_config.log_handle);
