@@ -143,6 +143,11 @@ static inline void flow_state_bind_temp_buffers(flow_feature_state_t* state, uns
     state->temp_double_buffer_2 = state->temp_double_buffer + bounded_len;
 }
 
+static inline int sni_bridge_enabled()
+{
+    return g_feat_config.sni_bridge_flag && g_feat_config.sni_bridge_id >= 0;
+}
+
 int flow_state_init(flow_feature_state_t* state)
 {
     if (!state) return -1;
@@ -187,6 +192,15 @@ int flow_state_init(flow_feature_state_t* state)
     ti_feature_config_t* cfg = feat_config_get();
     const unsigned int pool_num_windows = 100;
     const unsigned int pool_resp_delay_capacity = 1000;
+
+    state->first_n_capacity = cfg->first_n_packets;
+    if (state->first_n_capacity == 0) {
+        state->first_n_capacity = DEFAULT_FIRST_N_PACKETS;
+    } else if (state->first_n_capacity > MAX_FIRST_N_PACKETS) {
+        state->first_n_capacity = MAX_FIRST_N_PACKETS;
+    }
+    state->first_n_lens = (unsigned int*)malloc((size_t)state->first_n_capacity * sizeof(unsigned int));
+    if (!state->first_n_lens) goto cleanup;
 
     // 【优化 1】分级内存池：新流从最小级别开始（TINY=64 包）
     // 内存占用：~12KB/流（vs 之前 ~890KB/流）
@@ -320,6 +334,13 @@ cleanup:
 void flow_state_destroy(flow_feature_state_t* state)
 {
     if (!state) return;
+
+    if (state->first_n_lens) {
+        free(state->first_n_lens);
+        state->first_n_lens = NULL;
+    }
+    state->first_n_count = 0;
+    state->first_n_capacity = 0;
 
     // 【优化 3】使用内存池统一管理，只需一次 free 释放所有动态数组
     if (state->mem_pool) {
@@ -783,10 +804,10 @@ cJSON* flow_state_compute_features(flow_feature_state_t* state,
     add_flow_tuple_identifier(output, a_stream, a_stream_type);
 
     // 从 bridge 获取 SNI（如果配置了 sni_bridge_flag）
-    if (g_feat_config.sni_bridge_flag && g_feat_config.sni_bridge_id >= 0) {
+    if (sni_bridge_enabled()) {
         char* sni = (char*)stream_bridge_async_data_get(a_stream, g_feat_config.sni_bridge_id);
         if (sni != NULL) {
-            cJSON_AddStringToObject(output, "SNI", sni);
+            cJSON_AddStringToObject(output, "sni", sni);
         }
     }
 
@@ -895,7 +916,7 @@ UCHAR TI_FEATURES_SSL_ENTRY(stSessionInfo *session_info, void **pme, int thread_
     {
     case SSL_CLIENT_HELLO:
         // 提取 SNI 并放入 bridge
-        if (g_feat_config.sni_bridge_flag && g_feat_config.sni_bridge_id >= 0 &&
+        if (sni_bridge_enabled() &&
             a_ssl_stream && a_ssl_stream->stClientHello &&
             strlen((const char*)(a_ssl_stream->stClientHello->server_name)) > 0)
         {
@@ -904,6 +925,47 @@ UCHAR TI_FEATURES_SSL_ENTRY(stSessionInfo *session_info, void **pme, int thread_
                 memset(sni, 0, sizeof(char)*MAX_DOMAIN_LEN);
                 len = (int)MIN(strlen((const char*)(a_ssl_stream->stClientHello->server_name)), (size_t)(MAX_DOMAIN_LEN - 1));
                 memcpy(sni, a_ssl_stream->stClientHello->server_name, len);
+
+                if (stream_bridge_async_data_put(a_stream, g_feat_config.sni_bridge_id, sni) < 0) {
+                    free(sni);
+                }
+            }
+        }
+        break;
+    default:
+        break;
+    }
+
+    return PROT_STATE_GIVEME;
+}
+
+UCHAR TI_FEATURES_QUIC_ENTRY(stSessionInfo *session_info, void **pme, int thread_seq, struct streaminfo *a_stream, void *a_packet)
+{
+    (void)pme;
+    (void)thread_seq;
+    (void)a_packet;
+
+    if (!session_info || !a_stream) {
+        return PROT_STATE_GIVEME;
+    }
+
+    struct quic_info *quic_info = (struct quic_info *)session_info->app_info;
+    char* sni = NULL;
+    int len = 0;
+
+    switch(session_info->prot_flag)
+    {
+    case QUIC_CLIENT_HELLO:
+        // 提取 SNI 并放入 bridge
+        if (sni_bridge_enabled() &&
+            quic_info && quic_info->client_hello && quic_info->client_hello->sni &&
+            strlen(quic_info->client_hello->sni) > 0)
+        {
+            sni = (char*)malloc(sizeof(char) * MAX_DOMAIN_LEN);
+            if (sni) {
+                memset(sni, 0, sizeof(char) * MAX_DOMAIN_LEN);
+                len = (int)MIN(strlen(quic_info->client_hello->sni), (size_t)(MAX_DOMAIN_LEN - 1));
+                memcpy(sni, quic_info->client_hello->sni, len);
 
                 if (stream_bridge_async_data_put(a_stream, g_feat_config.sni_bridge_id, sni) < 0) {
                     free(sni);

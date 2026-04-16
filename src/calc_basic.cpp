@@ -82,9 +82,9 @@ void calc_packet_length_stats(flow_feature_state_t* state,
     // 更新序列 buffer
     circular_buffer_push(&state->pkt_len_seq, &pkt_len);
 
-    // 记录前 10 包
-    if (state->first_10_count < 10) {
-        state->first_10_lens[state->first_10_count++] = pkt_len;
+    // 记录前 N 包（N 来自配置）
+    if (state->first_n_lens && state->first_n_count < state->first_n_capacity) {
+        state->first_n_lens[state->first_n_count++] = pkt_len;
     }
 
     // 记录方向包长数组（用于分位数计算）
@@ -340,48 +340,69 @@ void calc_derived_basic(flow_feature_state_t* state, cJSON* output)
         cJSON_AddNumberToObject(output, "bwd_payload_q3", calc_q3_uint((unsigned int*)temp_buf, count));
     }
 
-    // 前 10 包统计（使用栈上数组，无需 malloc）
-    if (state->first_10_count > 0) {
-        double sum = 0, sum_sq = 0, min_val = state->first_10_lens[0], max_val = 0;
-        for (int i = 0; i < state->first_10_count; i++) {
-            sum += state->first_10_lens[i];
-            sum_sq += state->first_10_lens[i] * state->first_10_lens[i];
-            if (state->first_10_lens[i] < min_val) min_val = state->first_10_lens[i];
-            if (state->first_10_lens[i] > max_val) max_val = state->first_10_lens[i];
+    // 前 N 包统计（N 来自配置）
+    if (state->first_n_count > 0 && state->first_n_lens) {
+        unsigned int count = state->first_n_count;
+        double sum = 0, sum_sq = 0;
+        double min_val = state->first_n_lens[0], max_val = state->first_n_lens[0];
+
+        for (unsigned int i = 0; i < count; i++) {
+            sum += state->first_n_lens[i];
+            sum_sq += state->first_n_lens[i] * state->first_n_lens[i];
+            if (state->first_n_lens[i] < min_val) min_val = state->first_n_lens[i];
+            if (state->first_n_lens[i] > max_val) max_val = state->first_n_lens[i];
         }
-        double mean = sum / state->first_10_count;
-        cJSON_AddNumberToObject(output, "first_10_packets_length_mean", mean);
-        cJSON_AddNumberToObject(output, "first_10_packets_length_min", min_val);
-        cJSON_AddNumberToObject(output, "first_10_packets_length_max", max_val);
 
-        // 栈上排序
-        unsigned int first10_sorted_buf[10];
-        memcpy(first10_sorted_buf, state->first_10_lens, state->first_10_count * sizeof(unsigned int));
-        sort_small_uint_array(first10_sorted_buf, state->first_10_count);
+        double mean = sum / count;
+        double std = (count > 1) ?
+            sqrt((sum_sq - count * mean * mean) / (count - 1)) : 0;
 
-        cJSON_AddNumberToObject(output, "first_10_packets_length_median",
-            calc_median_uint(first10_sorted_buf, state->first_10_count));
-        cJSON_AddNumberToObject(output, "first_10_packets_length_q1",
-            calc_q1_uint(first10_sorted_buf, state->first_10_count));
-        cJSON_AddNumberToObject(output, "first_10_packets_length_q3",
-            calc_q3_uint(first10_sorted_buf, state->first_10_count));
+        cJSON_AddNumberToObject(output, "first_n_packets_length_mean", mean);
+        cJSON_AddNumberToObject(output, "first_n_packets_length_min", min_val);
+        cJSON_AddNumberToObject(output, "first_n_packets_length_max", max_val);
+        cJSON_AddNumberToObject(output, "first_n_packets_length_std", std);
 
-        if (state->first_10_count > 1) {
-            double std = sqrt((sum_sq - state->first_10_count * mean * mean) / (state->first_10_count - 1));
-            cJSON_AddNumberToObject(output, "first_10_packets_length_std", std);
+        unsigned int* sorted_buf = NULL;
+        double* first_n_double = NULL;
+        int use_temp_buf = (temp_buf && temp_buf2 && count <= max_len);
 
-            double first10_double[10];
-            for (int i = 0; i < state->first_10_count; i++) {
-                first10_double[i] = (double)state->first_10_lens[i];
-            }
-            cJSON_AddNumberToObject(output, "first_10_packets_length_skew",
-                calc_skewness(first10_double, state->first_10_count, mean, std));
-            cJSON_AddNumberToObject(output, "first_10_packets_length_kurt",
-                calc_kurtosis(first10_double, state->first_10_count, mean, std));
+        if (use_temp_buf) {
+            sorted_buf = (unsigned int*)temp_buf;
+            first_n_double = temp_buf2;
         } else {
-            cJSON_AddNumberToObject(output, "first_10_packets_length_std", 0);
-            cJSON_AddNumberToObject(output, "first_10_packets_length_skew", 0);
-            cJSON_AddNumberToObject(output, "first_10_packets_length_kurt", 0);
+            sorted_buf = (unsigned int*)malloc((size_t)count * sizeof(unsigned int));
+            first_n_double = (double*)malloc((size_t)count * sizeof(double));
+        }
+
+        if (sorted_buf) {
+            memcpy(sorted_buf, state->first_n_lens, (size_t)count * sizeof(unsigned int));
+            sort_small_uint_array(sorted_buf, (int)count);
+            cJSON_AddNumberToObject(output, "first_n_packets_length_median",
+                calc_median_uint(sorted_buf, count));
+            cJSON_AddNumberToObject(output, "first_n_packets_length_q1",
+                calc_q1_uint(sorted_buf, count));
+            cJSON_AddNumberToObject(output, "first_n_packets_length_q3",
+                calc_q3_uint(sorted_buf, count));
+        } else {
+            cJSON_AddNumberToObject(output, "first_n_packets_length_median", 0);
+            cJSON_AddNumberToObject(output, "first_n_packets_length_q1", 0);
+            cJSON_AddNumberToObject(output, "first_n_packets_length_q3", 0);
+        }
+
+        if (first_n_double && count > 1) {
+            prepare_double_buffer(first_n_double, state->first_n_lens, (int)count);
+            cJSON_AddNumberToObject(output, "first_n_packets_length_skew",
+                calc_skewness(first_n_double, (int)count, mean, std));
+            cJSON_AddNumberToObject(output, "first_n_packets_length_kurt",
+                calc_kurtosis(first_n_double, (int)count, mean, std));
+        } else {
+            cJSON_AddNumberToObject(output, "first_n_packets_length_skew", 0);
+            cJSON_AddNumberToObject(output, "first_n_packets_length_kurt", 0);
+        }
+
+        if (!use_temp_buf) {
+            if (sorted_buf) free(sorted_buf);
+            if (first_n_double) free(first_n_double);
         }
     }
 
@@ -508,11 +529,11 @@ void calc_derived_basic(flow_feature_state_t* state, cJSON* output)
 
         sort_small_uint_array(all_sorted, total_count);
 
-        cJSON_AddNumberToObject(output, "packet_length_median",
-            calc_median_uint(all_sorted, total_count));
-        cJSON_AddNumberToObject(output, "packet_length_q1",
-            calc_q1_uint(all_sorted, total_count));
-        cJSON_AddNumberToObject(output, "packet_length_q3",
-            calc_q3_uint(all_sorted, total_count));
+        // cJSON_AddNumberToObject(output, "packet_length_median",
+        //     calc_median_uint(all_sorted, total_count));
+        // cJSON_AddNumberToObject(output, "packet_length_q1",
+        //     calc_q1_uint(all_sorted, total_count));
+        // cJSON_AddNumberToObject(output, "packet_length_q3",
+        //     calc_q3_uint(all_sorted, total_count));
     }
 }

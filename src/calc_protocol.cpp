@@ -191,7 +191,7 @@ void calc_derived_protocol(flow_feature_state_t* state, cJSON* output)
 {
     cJSON_AddNumberToObject(output, "tcp_psh_count", state->tcp_psh_count);
     cJSON_AddNumberToObject(output, "tcp_urg_count", state->tcp_urg_count);
-    cJSON_AddNumberToObject(output, "tcp_syn_only_count", state->tcp_syn_only_count);
+    // cJSON_AddNumberToObject(output, "tcp_syn_only_count", state->tcp_syn_only_count);
     cJSON_AddNumberToObject(output, "window_update_frequency", state->tcp_window_update_count);
     cJSON_AddNumberToObject(output, "tcp_syn_packets", state->tcp_syn_count);
     cJSON_AddNumberToObject(output, "tcp_syn_ack_packets", state->tcp_syn_ack_count);
@@ -362,13 +362,13 @@ void calc_derived_protocol(flow_feature_state_t* state, cJSON* output)
         port_to_protocol(state->dst_port));
 
     // 历史兼容字段（缺少底层语义时用近似或占位）
-    cJSON_AddNumberToObject(output, "tcpAckFaultCnt", 0);
-    cJSON_AddNumberToObject(output, "tcpBFlgtMx", 0);
-    cJSON_AddNumberToObject(output, "tcpFlwLssAckRcvdBytes", 0);
-    cJSON_AddNumberToObject(output, "tcpISeqN", state->last_fwd_seq);
-    cJSON_AddNumberToObject(output, "tcpInitWinSz", (state->tcp_window_stats.count > 0) ? state->tcp_window_stats.mean : 0);
-    cJSON_AddNumberToObject(output, "tcpPAckCnt", state->tcp_ack_count);
-    cJSON_AddNumberToObject(output, "tcpPSeqCnt", state->tcp_packets);
-    cJSON_AddNumberToObject(output, "tcpSeqFaultCnt", state->tcp_retransmission_count);
-    cJSON_AddNumberToObject(output, "tcpSeqSntBytes", state->fwd_payload_bytes + state->bwd_payload_bytes);
+    cJSON_AddNumberToObject(output, "tcpackfaultcnt", 0);
+    cJSON_AddNumberToObject(output, "tcpbflgtmx", 0);
+    cJSON_AddNumberToObject(output, "tcpflwlssackrcvdbytes", 0);
+    cJSON_AddNumberToObject(output, "tcpiseqn", state->last_fwd_seq);
+    cJSON_AddNumberToObject(output, "tcpinitwinsz", (state->tcp_window_stats.count > 0) ? state->tcp_window_stats.mean : 0);
+    cJSON_AddNumberToObject(output, "tcppackcnt", state->tcp_ack_count);
+    cJSON_AddNumberToObject(output, "tcppseqcnt", state->tcp_packets);
+    cJSON_AddNumberToObject(output, "tcpseqfaultcnt", state->tcp_retransmission_count);
+    cJSON_AddNumberToObject(output, "tcpseqsntbytes", state->fwd_payload_bytes + state->bwd_payload_bytes);
 }

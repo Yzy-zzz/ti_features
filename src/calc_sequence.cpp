@@ -582,7 +582,7 @@ void calc_derived_sequence(flow_feature_state_t* state, cJSON* output)
                 }
                 l2l3l4pl_iat << l2_v << "/" << l3_lens[i] << "/" << l4_lens[i] << "/" << payload_lens[i] << "/" << iat_v;
             }
-            cJSON_AddStringToObject(output, "L2L3L4Pl_Iat", l2l3l4pl_iat.str().c_str());
+            cJSON_AddStringToObject(output, "l2l3l4pl_iat", l2l3l4pl_iat.str().c_str());
         }
 
         if (lens) free(lens);
@@ -645,7 +645,7 @@ void calc_derived_sequence(flow_feature_state_t* state, cJSON* output)
                 }
                 cJSON_AddStringToObject(output, "dl_chunk_seq", chunk_oss.str().c_str());
                 state->last_dl_chunk_count = chunk_count;
-                cJSON_AddNumberToObject(output, "dl_chunk_count", chunk_count);
+                // cJSON_AddNumberToObject(output, "dl_chunk_count", chunk_count);
             }
             if (up) free(up);
             if (down) free(down);
@@ -666,7 +666,7 @@ void calc_derived_sequence(flow_feature_state_t* state, cJSON* output)
     // Bigram 频率
     bigram_stats_t* b = &state->bigram_stats;
     if (b->total > 0) {
-        const char* names[9] = {"SS","SM","SL","MS","MM","ML","LS","LM","LL"};
+        const char* names[9] = {"ss","sm","sl","ms","mm","ml","ls","lm","ll"};
         struct rank_item { int type; unsigned int count; } ranks[9];
         for (int i = 0; i < 9; i++) {
             ranks[i].type = i;

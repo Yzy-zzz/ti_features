@@ -214,16 +214,16 @@ void calc_derived_payload(flow_feature_state_t* state, cJSON* output)
     }
 
     // 协议魔数
-    cJSON_AddNumberToObject(output, "payload_magic_HTTP_GET", state->payload_magic_HTTP_GET);
-    cJSON_AddNumberToObject(output, "payload_magic_HTTP_POST", state->payload_magic_HTTP_POST);
-    cJSON_AddNumberToObject(output, "payload_magic_TLS_1_0", state->payload_magic_TLS_1_0);
-    cJSON_AddNumberToObject(output, "payload_magic_TLS_1_1", state->payload_magic_TLS_1_1);
-    cJSON_AddNumberToObject(output, "payload_magic_TLS_1_2", state->payload_magic_TLS_1_2);
-    cJSON_AddNumberToObject(output, "payload_magic_TLS_1_3", state->payload_magic_TLS_1_3);
-    cJSON_AddNumberToObject(output, "payload_magic_SSH", state->payload_magic_SSH);
-    cJSON_AddNumberToObject(output, "payload_magic_JPEG", state->payload_magic_JPEG);
-    cJSON_AddNumberToObject(output, "payload_magic_PNG", state->payload_magic_PNG);
-    cJSON_AddNumberToObject(output, "payload_magic_GIF", state->payload_magic_GIF);
+    cJSON_AddNumberToObject(output, "payload_magic_http_get", state->payload_magic_HTTP_GET);
+    cJSON_AddNumberToObject(output, "payload_magic_http_post", state->payload_magic_HTTP_POST);
+    cJSON_AddNumberToObject(output, "payload_magic_tls_1_0", state->payload_magic_TLS_1_0);
+    cJSON_AddNumberToObject(output, "payload_magic_tls_1_1", state->payload_magic_TLS_1_1);
+    cJSON_AddNumberToObject(output, "payload_magic_tls_1_2", state->payload_magic_TLS_1_2);
+    cJSON_AddNumberToObject(output, "payload_magic_tls_1_3", state->payload_magic_TLS_1_3);
+    cJSON_AddNumberToObject(output, "payload_magic_ssh", state->payload_magic_SSH);
+    cJSON_AddNumberToObject(output, "payload_magic_jpeg", state->payload_magic_JPEG);
+    cJSON_AddNumberToObject(output, "payload_magic_png", state->payload_magic_PNG);
+    cJSON_AddNumberToObject(output, "payload_magic_gif", state->payload_magic_GIF);
     int known_magic = state->payload_magic_HTTP_GET || state->payload_magic_HTTP_POST ||
         state->payload_magic_TLS_1_0 || state->payload_magic_TLS_1_1 || state->payload_magic_TLS_1_2 ||
         state->payload_magic_TLS_1_3 || state->payload_magic_SSH || state->payload_magic_JPEG ||
@@ -259,7 +259,7 @@ void calc_derived_payload(flow_feature_state_t* state, cJSON* output)
     // 这里先使用简化的 16 bin 版本计算熵和卡方
     double hist_entropy = calc_shannon_entropy(state->payload_byte_hist, 16);
     double hist_chi_square = calc_chi_square_uniform(state->payload_byte_hist, 16);
-    cJSON_AddNumberToObject(output, "payload_hist_entropy", hist_entropy);
+    // cJSON_AddNumberToObject(output, "payload_hist_entropy", hist_entropy);
     cJSON_AddNumberToObject(output, "payload_chi_square", hist_chi_square);
 
     // Payload 高级统计（按包聚合）

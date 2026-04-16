@@ -16,6 +16,7 @@ typedef struct _ti_feature_config
 
     // 序列长度限制
     unsigned int max_seq_len;
+    unsigned int first_n_packets;         // 前 N 包统计窗口大小
 
     // 时间来源模式：0=包时间戳，1=平台当前时间
     unsigned int run_mode;
@@ -33,9 +34,6 @@ typedef struct _ti_feature_config
     // 时间窗口大小
     unsigned int window_size_ms;           // 窗口大小 (毫秒)
     unsigned int instant_bitrate_window_ms; // 瞬时比特率窗口 (毫秒)
-
-    // FFT 配置
-    unsigned int fft_top_k;                // FFT Top K 频率
 
     // 行为特征阈值
     unsigned int interactive_threshold_ms;  // 交互式会话响应延迟阈值

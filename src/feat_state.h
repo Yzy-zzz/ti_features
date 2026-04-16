@@ -212,9 +212,10 @@ typedef struct _flow_feature_state
     unsigned long long active_time_us;       // 活跃时间累加
     unsigned long long idle_time_us;         // 空闲时间累加
 
-    // === 第一个包信息 ===
-    int first_10_count;                      // 前 10 包计数
-    unsigned int first_10_lens[10];          // 前 10 包长度
+    // === 前 N 包统计窗口 ===
+    unsigned int first_n_count;              // 前 N 包计数
+    unsigned int first_n_capacity;           // 前 N 包容量（来自配置）
+    unsigned int* first_n_lens;              // 前 N 包长度
 
     // === 协议魔数检测 ===
     int payload_magic_HTTP_GET;

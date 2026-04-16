@@ -61,7 +61,7 @@ void calc_derived_window(flow_feature_state_t* state, cJSON* output)
     }
 
     if (valid_windows == 0) {
-        cJSON_AddNullToObject(output, "window_stats_unavailable");
+        // cJSON_AddNullToObject(output, "window_stats_unavailable");
         return;
     }
 
@@ -179,38 +179,38 @@ void calc_derived_window(flow_feature_state_t* state, cJSON* output)
         free(byte_counts);
     }
 
-    // === 窗口比特率统计 ===
-    {
-        double sum = 0, sum_sq = 0;
-        unsigned int min_val = 0;
-        unsigned int max_val = 0;
-        int valid_bitrate_windows = 0;
+    // // === 窗口比特率统计 ===
+    // {
+    //     double sum = 0, sum_sq = 0;
+    //     unsigned int min_val = 0;
+    //     unsigned int max_val = 0;
+    //     int valid_bitrate_windows = 0;
 
-        // 先找到有效窗口数
-        for (unsigned int i = 0; i < num_windows; i++) {
-            if (state->window_pkt_counts[i] > 0) {
-                if (valid_bitrate_windows == 0) {
-                    min_val = state->window_bitrate[i];
-                    max_val = state->window_bitrate[i];
-                } else {
-                    if (state->window_bitrate[i] < min_val) min_val = state->window_bitrate[i];
-                    if (state->window_bitrate[i] > max_val) max_val = state->window_bitrate[i];
-                }
-                sum += state->window_bitrate[i];
-                sum_sq += state->window_bitrate[i] * state->window_bitrate[i];
-                valid_bitrate_windows++;
-            }
-        }
+    //     // 先找到有效窗口数
+    //     for (unsigned int i = 0; i < num_windows; i++) {
+    //         if (state->window_pkt_counts[i] > 0) {
+    //             if (valid_bitrate_windows == 0) {
+    //                 min_val = state->window_bitrate[i];
+    //                 max_val = state->window_bitrate[i];
+    //             } else {
+    //                 if (state->window_bitrate[i] < min_val) min_val = state->window_bitrate[i];
+    //                 if (state->window_bitrate[i] > max_val) max_val = state->window_bitrate[i];
+    //             }
+    //             sum += state->window_bitrate[i];
+    //             sum_sq += state->window_bitrate[i] * state->window_bitrate[i];
+    //             valid_bitrate_windows++;
+    //         }
+    //     }
 
-        if (valid_bitrate_windows > 0) {
-            double mean = sum / valid_bitrate_windows;
-            double std = (valid_bitrate_windows > 1) ?
-                sqrt((sum_sq - valid_bitrate_windows * mean * mean) / (valid_bitrate_windows - 1)) : 0;
+    //     if (valid_bitrate_windows > 0) {
+    //         double mean = sum / valid_bitrate_windows;
+    //         double std = (valid_bitrate_windows > 1) ?
+    //             sqrt((sum_sq - valid_bitrate_windows * mean * mean) / (valid_bitrate_windows - 1)) : 0;
 
-            cJSON_AddNumberToObject(output, "window_bitrate_mean", mean);
-            cJSON_AddNumberToObject(output, "window_bitrate_std", std);
-            cJSON_AddNumberToObject(output, "window_bitrate_min", min_val);
-            cJSON_AddNumberToObject(output, "window_bitrate_max", max_val);
-        }
-    }
+    //         cJSON_AddNumberToObject(output, "window_bitrate_mean", mean);
+    //         cJSON_AddNumberToObject(output, "window_bitrate_std", std);
+    //         cJSON_AddNumberToObject(output, "window_bitrate_min", min_val);
+    //         cJSON_AddNumberToObject(output, "window_bitrate_max", max_val);
+    //     }
+    // }
 }

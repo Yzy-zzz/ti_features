@@ -49,6 +49,7 @@ int feat_config_init(void)
 
     // 序列长度限制
     g_feat_config.max_seq_len = DEFAULT_MAX_SEQ_LEN;
+    g_feat_config.first_n_packets = DEFAULT_FIRST_N_PACKETS;
     g_feat_config.run_mode = 0;
 
     // 包大小阈值
@@ -64,9 +65,6 @@ int feat_config_init(void)
     // 时间窗口大小
     g_feat_config.window_size_ms = DEFAULT_WINDOW_SIZE_MS;
     g_feat_config.instant_bitrate_window_ms = DEFAULT_INSTANT_BITRATE_WINDOW_MS;
-
-    // FFT 配置
-    g_feat_config.fft_top_k = DEFAULT_FFT_TOP_K;
 
     // 行为特征阈值
     g_feat_config.interactive_threshold_ms = DEFAULT_INTERACTIVE_THRESHOLD_MS;
@@ -109,9 +107,16 @@ int feat_config_read(const char* filename)
 
     // 基础配置
     MESA_load_profile_uint_def(filename, "FEATURE", "max_seq_len", &g_feat_config.max_seq_len, DEFAULT_MAX_SEQ_LEN);
+    MESA_load_profile_uint_def(filename, "FEATURE", "first_n_packets", &g_feat_config.first_n_packets, DEFAULT_FIRST_N_PACKETS);
     MESA_load_profile_uint_def(filename, "FEATURE", "run_mode", &g_feat_config.run_mode, 0);
     MESA_load_profile_uint_def(filename, "FEATURE", "small_pkt_threshold", &g_feat_config.small_pkt_threshold, DEFAULT_SMALL_PKT_THRESHOLD);
     MESA_load_profile_uint_def(filename, "FEATURE", "large_pkt_threshold", &g_feat_config.large_pkt_threshold, DEFAULT_LARGE_PKT_THRESHOLD);
+
+    if (g_feat_config.first_n_packets == 0) {
+        g_feat_config.first_n_packets = DEFAULT_FIRST_N_PACKETS;
+    } else if (g_feat_config.first_n_packets > MAX_FIRST_N_PACKETS) {
+        g_feat_config.first_n_packets = MAX_FIRST_N_PACKETS;
+    }
 
     // Burst 配置
     MESA_load_profile_uint_def(filename, "BURST", "burst_iat_threshold_us", &g_feat_config.burst_iat_threshold_us, DEFAULT_BURST_IAT_THRESHOLD_US);
@@ -122,9 +127,6 @@ int feat_config_read(const char* filename)
     // 窗口配置
     MESA_load_profile_uint_def(filename, "WINDOW", "window_size_ms", &g_feat_config.window_size_ms, DEFAULT_WINDOW_SIZE_MS);
     MESA_load_profile_uint_def(filename, "WINDOW", "instant_bitrate_window_ms", &g_feat_config.instant_bitrate_window_ms, DEFAULT_INSTANT_BITRATE_WINDOW_MS);
-
-    // FFT 配置
-    MESA_load_profile_uint_def(filename, "FFT", "fft_top_k", &g_feat_config.fft_top_k, DEFAULT_FFT_TOP_K);
 
     // 行为配置
     MESA_load_profile_uint_def(filename, "BEHAVIOR", "interactive_threshold_ms", &g_feat_config.interactive_threshold_ms, DEFAULT_INTERACTIVE_THRESHOLD_MS);

@@ -48,7 +48,8 @@
 #define DEFAULT_INTERACTIVE_THRESHOLD_MS  100
 #define DEFAULT_BULK_TRANSFER_KBPS      10
 #define DEFAULT_SHORT_CONN_THRESHOLD_S  2
-#define DEFAULT_FFT_TOP_K               5
+#define DEFAULT_FIRST_N_PACKETS         10
+#define MAX_FIRST_N_PACKETS             1024
 
 // 流方向
 #define DIR_UNKNOWN     0
@@ -80,7 +81,7 @@ extern "C" {
 UCHAR TI_FEATURES_UDP_ENTRY(struct streaminfo *a_stream, void **pme, int thread_seq, void *a_packet);
 UCHAR TI_FEATURES_TCP_ENTRY(struct streaminfo *a_stream, void **pme, int thread_seq, void *a_packet);
 UCHAR TI_FEATURES_SSL_ENTRY(stSessionInfo *session_info, void **pme, int thread_seq, struct streaminfo *a_stream, void *a_packet);
-// UCHAR TI_FEATURES_QUIC_ENTRY(stSessionInfo *session_info, void **pme, int thread_seq, struct streaminfo *a_stream, void *a_packet);
+UCHAR TI_FEATURES_QUIC_ENTRY(stSessionInfo *session_info, void **pme, int thread_seq, struct streaminfo *a_stream, void *a_packet);
 int TI_FEATURES_INIT(void);
 void TI_FEATURES_DESTROY(void);
 
