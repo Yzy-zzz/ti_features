@@ -60,6 +60,10 @@ typedef struct _flow_feature_state
     unsigned int last_fwd_seq;
     unsigned int last_bwd_seq;
 
+    // === 小/大包增量计数 ===
+    unsigned int small_pkt_count;
+    unsigned int large_pkt_count;
+
     // === 运行统计（在线计算） ===
     running_stats_t pkt_len_stats;           // 包长统计
     directional_running_stats_t fwd_pkt_len; // 前向包长

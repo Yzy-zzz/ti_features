@@ -75,6 +75,11 @@ void calc_packet_length_stats(flow_feature_state_t* state,
     // 更新整体统计
     running_stats_update(&state->pkt_len_stats, (double)pkt_len);
 
+    // 增量维护小/大包计数
+    ti_feature_config_t* cfg = feat_config_get();
+    if (pkt_len <= cfg->small_pkt_threshold) state->small_pkt_count++;
+    if (pkt_len >= cfg->large_pkt_threshold) state->large_pkt_count++;
+
     // 更新方向统计
     directional_stats_update(&state->fwd_pkt_len, direction, (double)pkt_len);
     directional_stats_update(&state->bwd_pkt_len, direction, (double)pkt_len);
@@ -406,26 +411,13 @@ void calc_derived_basic(flow_feature_state_t* state, cJSON* output)
         }
     }
 
-    // 小包/大包比例（优化：避免 malloc，直接使用 circular_buffer 内部数据）
-    unsigned int small_pkt_count = 0, large_pkt_count = 0;
-    unsigned int pkt_count = circular_buffer_count(&state->pkt_len_seq);
-    if (pkt_count > 0 &&
-        state->pkt_len_seq.data != NULL &&
-        state->pkt_len_seq.elem_size == sizeof(unsigned int) &&
-        state->pkt_len_seq.capacity > 0 &&
-        pkt_count <= state->pkt_len_seq.capacity) {
-        // 直接遍历 buffer 而不复制
-        for (unsigned int i = 0; i < pkt_count; i++) {
-            unsigned int* pkt = (unsigned int*)circular_buffer_get(&state->pkt_len_seq, i);
-            if (pkt) {
-                if (*pkt <= cfg->small_pkt_threshold) small_pkt_count++;
-                if (*pkt >= cfg->large_pkt_threshold) large_pkt_count++;
-            }
-        }
+    // 小包/大包比例（使用 DATA 阶段增量维护的计数器）
+    unsigned int pkt_count = state->total_packets;
+    if (pkt_count > 0) {
         cJSON_AddNumberToObject(output, "small_packet_ratio",
-            (double)small_pkt_count / pkt_count);
+            (double)state->small_pkt_count / pkt_count);
         cJSON_AddNumberToObject(output, "large_packet_ratio",
-            (double)large_pkt_count / pkt_count);
+            (double)state->large_pkt_count / pkt_count);
     } else {
         cJSON_AddNumberToObject(output, "small_packet_ratio", 0);
         cJSON_AddNumberToObject(output, "large_packet_ratio", 0);
