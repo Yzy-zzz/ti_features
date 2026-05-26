@@ -27,6 +27,7 @@
 #include "MESA/cJSON.h"
 #include "ssl.h"
 #include "quic.h"
+#include "transformer_master.h"
 
 #define TI_FEATURES_SO "ti_features.so"
 #define MAX_PATH_LEN        256

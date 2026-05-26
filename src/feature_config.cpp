@@ -167,6 +167,13 @@ int feat_config_read(const char* filename)
 
     // bridge 桥接初始化 - 仅当 feature_bridge_flag 为 1 时初始化
     if (g_feat_config.feature_bridge_flag) {
+#if 1
+        g_feat_config.feature_bridge_id = TF_get_brgid(FEATURE_BRIDGE);
+        if(g_feat_config.feature_bridge_id < 0)
+        {
+            MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_FATAL, "INIT_BRIDGE", "stream_bridge_build is error, bridge_name: FEATURE_BRIDGE");
+        }
+#else
         g_feat_config.feature_bridge_id = stream_bridge_build(g_feat_config.feature_bridge_name, "w");
         if (g_feat_config.feature_bridge_id < 0) {
             MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_FATAL, TI_FEATURES, "FEATURE_BRIDGE stream_bridge_build failed, name=%s!!!", g_feat_config.feature_bridge_name);
@@ -185,6 +192,7 @@ int feat_config_read(const char* filename)
             return -1;
         }
         MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_INFO, TI_FEATURES, "FEATURE bridge free callback registered, bridge_id=%d", g_feat_config.feature_bridge_id);
+#endif
     } else {
         MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_INFO, TI_FEATURES, "FEATURE bridge disabled by config");
     }
