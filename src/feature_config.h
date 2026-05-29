@@ -61,6 +61,20 @@ typedef struct _ti_feature_config
     // 输出原始序列标志
     unsigned int output_raw_seq;
 
+    // 特征模块开关 (0=关闭, 1=开启, 默认全部开启)
+    unsigned int enable_basic;         // 基础计数+包长
+    unsigned int enable_iat;           // 到达间隔
+    unsigned int enable_burst;         // 突发检测
+    unsigned int enable_protocol;      // 协议头
+    unsigned int enable_payload;       // 载荷分析
+    unsigned int enable_sequence;      // 序列特征
+    unsigned int enable_fft;           // 频域特征
+    unsigned int enable_window;        // 时间窗
+    unsigned int enable_behavior;      // 行为特征
+
+    // 每包阶段子开关
+    unsigned int enable_payload_stats; // 每包熵/压缩率计算 (关闭可大幅提升性能)
+
 } ti_feature_config_t;
 
 // 全局配置实例

@@ -82,6 +82,18 @@ int feat_config_init(void)
     // 输出原始序列
     g_feat_config.output_raw_seq = 1;
 
+    // 特征模块开关（默认全部开启）
+    g_feat_config.enable_basic = 1;
+    g_feat_config.enable_iat = 1;
+    g_feat_config.enable_burst = 1;
+    g_feat_config.enable_protocol = 1;
+    g_feat_config.enable_payload = 1;
+    g_feat_config.enable_sequence = 1;
+    g_feat_config.enable_fft = 1;
+    g_feat_config.enable_window = 1;
+    g_feat_config.enable_behavior = 1;
+    g_feat_config.enable_payload_stats = 1;
+
     return 0;
 }
 
@@ -248,6 +260,25 @@ int feat_config_read(const char* filename)
 
     // 输出配置
     MESA_load_profile_uint_def(filename, "OUTPUT", "output_raw_seq", &g_feat_config.output_raw_seq, 1);
+
+    // 特征模块开关
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_basic", &g_feat_config.enable_basic, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_iat", &g_feat_config.enable_iat, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_burst", &g_feat_config.enable_burst, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_protocol", &g_feat_config.enable_protocol, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_payload", &g_feat_config.enable_payload, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_sequence", &g_feat_config.enable_sequence, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_fft", &g_feat_config.enable_fft, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_window", &g_feat_config.enable_window, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_behavior", &g_feat_config.enable_behavior, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_payload_stats", &g_feat_config.enable_payload_stats, 1);
+
+    MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_INFO, TI_FEATURES,
+        "Feature modules: basic=%u iat=%u burst=%u protocol=%u payload=%u sequence=%u fft=%u window=%u behavior=%u payload_stats=%u",
+        g_feat_config.enable_basic, g_feat_config.enable_iat, g_feat_config.enable_burst,
+        g_feat_config.enable_protocol, g_feat_config.enable_payload, g_feat_config.enable_sequence,
+        g_feat_config.enable_fft, g_feat_config.enable_window, g_feat_config.enable_behavior,
+        g_feat_config.enable_payload_stats);
 
     return 0;
 }

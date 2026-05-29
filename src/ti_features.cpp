@@ -655,8 +655,9 @@ UCHAR traffic_process(struct streaminfo *a_stream, void **pme, int thread_seq,
                 } else if (a_stream_type == UDP) {
                     payload += 8;  // UDP header
                 }
-                calc_payload_stats(state, payload, payload_len);
                 calc_payload_magic(state, payload, payload_len);
+                if (g_feat_config.enable_payload_stats)
+                    calc_payload_stats(state, payload, payload_len);
             }
 
             // 更新 Burst 状态
@@ -812,31 +813,40 @@ cJSON* flow_state_compute_features(flow_feature_state_t* state,
     }
 
     // 基础特征
-    calc_derived_basic(state, output);
+    if (g_feat_config.enable_basic)
+        calc_derived_basic(state, output);
 
     // IAT 特征
-    calc_derived_iat(state, output);
+    if (g_feat_config.enable_iat)
+        calc_derived_iat(state, output);
 
     // Burst 特征
-    calc_burst_statistics(state, output);
+    if (g_feat_config.enable_burst)
+        calc_burst_statistics(state, output);
 
     // 协议特征
-    calc_derived_protocol(state, output);
+    if (g_feat_config.enable_protocol)
+        calc_derived_protocol(state, output);
 
     // Payload 特征
-    calc_derived_payload(state, output);
+    if (g_feat_config.enable_payload)
+        calc_derived_payload(state, output);
 
     // 序列特征
-    calc_derived_sequence(state, output);
+    if (g_feat_config.enable_sequence)
+        calc_derived_sequence(state, output);
 
     // FFT 频域特征
-    calc_derived_fft(state, output);
+    if (g_feat_config.enable_fft)
+        calc_derived_fft(state, output);
 
     // 窗口特征
-    calc_derived_window(state, output);
+    if (g_feat_config.enable_window)
+        calc_derived_window(state, output);
 
     // 行为特征
-    calc_derived_behavior(state, output);
+    if (g_feat_config.enable_behavior)
+        calc_derived_behavior(state, output);
 
     // 添加流基本信息
     cJSON_AddNumberToObject(output, "total_packets", state->total_packets);
