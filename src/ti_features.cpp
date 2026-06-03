@@ -605,11 +605,12 @@ UCHAR traffic_process(struct streaminfo *a_stream, void **pme, int thread_seq,
                 ring_buffer_snapshot_release(&payload_len_snap);
             }
 
-            // 每包更新协议头统计
-            if (iph) {
+            // 每包更新协议头统计（按开关控制）
+            if (iph && g_feat_config.enable_protocol_ip) {
                 calc_protocol_ip_update(state, iph);
             }
-            if (a_stream->addr.addrtype == ADDR_TYPE_IPV4) {
+            if (g_feat_config.enable_protocol_port &&
+                a_stream->addr.addrtype == ADDR_TYPE_IPV4) {
                 struct stream_tuple4_v4 *paddr = (struct stream_tuple4_v4 *)a_stream->addr.paddr;
                 if (paddr) {
                     calc_protocol_port_update(state, paddr->source, paddr->dest);
@@ -626,28 +627,38 @@ UCHAR traffic_process(struct streaminfo *a_stream, void **pme, int thread_seq,
             // 更新包长统计
             calc_packet_length_stats(state, direction, pkt_len);
 
-            // 更新方向与时间戳序列
+            // 更新方向与时间戳序列（按需采集）
             signed char dir_val = (direction == DIR_FWD) ? 1 : ((direction == DIR_BWD) ? -1 : 0);
-            circular_buffer_push(&state->dir_seq, &dir_val);
-            circular_buffer_push(&state->ts_seq, &ts_us);
-            circular_buffer_push(&state->l3_len_seq, &l3_len);
-            circular_buffer_push(&state->l4_len_seq, &l4_len);
-            circular_buffer_push(&state->payload_len_seq, &payload_len);
+            if (g_feat_config.need_dir_seq)
+                circular_buffer_push(&state->dir_seq, &dir_val);
+            if (g_feat_config.need_ts_seq)
+                circular_buffer_push(&state->ts_seq, &ts_us);
+            if (g_feat_config.need_l3_l4_payload_seq) {
+                circular_buffer_push(&state->l3_len_seq, &l3_len);
+                circular_buffer_push(&state->l4_len_seq, &l4_len);
+                circular_buffer_push(&state->payload_len_seq, &payload_len);
+            }
+
+            // 计算 IAT（必须在 calc_iat_update 之前，否则 last_arrival_us 已被更新）
+            unsigned long long burst_iat = (state->last_arrival_us > 0) ?
+                (ts_us - state->last_arrival_us) : 0;
 
             // 更新 IAT 统计
             calc_iat_update(state, ts_us, direction);
 
-            // 更新 TCP 标志统计
-            if (a_stream_type == TCP && tcph) {
+            // 更新 TCP 标志统计（按开关控制）
+            if (a_stream_type == TCP && tcph &&
+                (g_feat_config.enable_protocol_tcp_flags ||
+                 g_feat_config.enable_protocol_tcp_window)) {
                 calc_protocol_tcp_update(state, tcph, payload_len, ntohs(tcph->window),
                                          direction, ntohl(tcph->seq), ts_us);
-            } else if (a_stream_type == UDP) {
+            } else if (a_stream_type == UDP && g_feat_config.enable_protocol_udp) {
                 unsigned int udp_len = payload_len + 8;
                 running_stats_update(&state->udp_len_stats, (double)udp_len);
                 circular_buffer_push(&state->udp_len_seq, &udp_len);
             }
 
-            // 更新 Payload 统计
+            // 更新 Payload 统计（按开关控制）
             if (payload_len > 0 && iph && packet_bytes) {
                 unsigned char* payload = packet_bytes + iph->ihl * 4;
                 if (a_stream_type == TCP && tcph) {
@@ -655,25 +666,31 @@ UCHAR traffic_process(struct streaminfo *a_stream, void **pme, int thread_seq,
                 } else if (a_stream_type == UDP) {
                     payload += 8;  // UDP header
                 }
-                calc_payload_magic(state, payload, payload_len);
+                if (g_feat_config.enable_payload_magic)
+                    calc_payload_magic(state, payload, payload_len);
                 if (g_feat_config.enable_payload_stats)
                     calc_payload_stats(state, payload, payload_len);
             }
 
-            // 更新 Burst 状态
-            unsigned long long iat = ts_us - state->last_arrival_us;
-            calc_burst_update(state, pkt_len, iat, ts_us);
+            // 更新 Burst 状态（按开关控制）
+            if (g_feat_config.enable_burst) {
+                calc_burst_update(state, pkt_len, burst_iat, ts_us);
+            }
 
-            // 更新 Bigram 统计
-            pkt_size_class curr_class = get_pkt_size_class(pkt_len);
-            bigram_update(&state->bigram_stats, state->last_pkt_size_class, curr_class);
-            state->last_pkt_size_class = curr_class;
+            // 更新 Bigram 统计（按开关控制）
+            if (g_feat_config.enable_sequence_stats) {
+                pkt_size_class curr_class = get_pkt_size_class(pkt_len);
+                bigram_update(&state->bigram_stats, state->last_pkt_size_class, curr_class);
+                state->last_pkt_size_class = curr_class;
+            }
 
-            // 更新响应延迟
-            calc_response_delay(state, ts_us, direction);
+            // 更新响应延迟（按开关控制）
+            if (g_feat_config.enable_iat_response)
+                calc_response_delay(state, ts_us, direction);
 
-            // 更新窗口统计
-            calc_window_update(state, pkt_len, ts_us);
+            // 更新窗口统计（按开关控制，behavior 模块也依赖窗口数据）
+            if (g_feat_config.need_window_update)
+                calc_window_update(state, pkt_len, ts_us);
 
             break;
         }

@@ -49,7 +49,7 @@ void calc_window_update(flow_feature_state_t* state,
 // 计算窗口统计特征
 void calc_derived_window(flow_feature_state_t* state, cJSON* output)
 {
-    // ti_feature_config_t* cfg = feat_config_get();
+    ti_feature_config_t* cfg = feat_config_get();
     unsigned int num_windows = state->num_windows;
 
     // 只统计有数据的窗口
@@ -61,12 +61,13 @@ void calc_derived_window(flow_feature_state_t* state, cJSON* output)
     }
 
     if (valid_windows == 0) {
-        // cJSON_AddNullToObject(output, "window_stats_unavailable");
         return;
     }
 
-    // === 窗口包数统计 ===
-    {
+    // === enable_window_pkt: 窗口包数统计 (9 维) ===
+    if (!cfg->enable_window_pkt && !cfg->enable_window_byte) return;
+
+    if (cfg->enable_window_pkt) {
         double sum = 0, sum_sq = 0;
         unsigned int min_val = state->window_pkt_counts[0];
         unsigned int max_val = 0;
@@ -122,8 +123,8 @@ void calc_derived_window(flow_feature_state_t* state, cJSON* output)
         free(pkt_counts);
     }
 
-    // === 窗口字节数统计 ===
-    {
+    // === enable_window_byte: 窗口字节数统计 (9 维) ===
+    if (cfg->enable_window_byte) {
         double sum = 0, sum_sq = 0;
         unsigned int min_val = state->window_byte_counts[0];
         unsigned int max_val = 0;

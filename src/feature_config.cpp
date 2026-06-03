@@ -79,20 +79,67 @@ int feat_config_init(void)
     g_feat_config.feature_bridge_flag = 1;
     snprintf(g_feat_config.feature_bridge_name, MAX_DOMAIN_LEN, "%s", "FEATURE_BRIDGE");
 
-    // 输出原始序列
-    g_feat_config.output_raw_seq = 1;
-
-    // 特征模块开关（默认全部开启）
+    // 特征模块总开关（默认全部开启）
     g_feat_config.enable_basic = 1;
     g_feat_config.enable_iat = 1;
-    g_feat_config.enable_burst = 1;
+    // enable_burst 在下方子开关中设置
     g_feat_config.enable_protocol = 1;
     g_feat_config.enable_payload = 1;
     g_feat_config.enable_sequence = 1;
     g_feat_config.enable_fft = 1;
     g_feat_config.enable_window = 1;
     g_feat_config.enable_behavior = 1;
+
+    // 特征模块子开关（默认全部开启）
+
+    // 基础模块
+    g_feat_config.enable_basic_ratios = 1;
+    g_feat_config.enable_basic_payload_dir = 1;
+    g_feat_config.enable_basic_first_n = 1;
+    g_feat_config.enable_basic_pkt_length = 1;
+
+    // IAT 模块
+    g_feat_config.enable_iat_stats = 1;
+    g_feat_config.enable_iat_fwd_bwd = 1;
+    g_feat_config.enable_iat_active = 1;
+    g_feat_config.enable_iat_response = 1;
+
+    // Burst 模块
+    g_feat_config.enable_burst = 1;
+
+    // 协议模块
+    g_feat_config.enable_protocol_tcp_flags = 1;
+    g_feat_config.enable_protocol_tcp_window = 1;
+    g_feat_config.enable_protocol_ip = 1;
+    g_feat_config.enable_protocol_udp = 1;
+    g_feat_config.enable_protocol_port = 1;
+
+    // Payload 模块
+    g_feat_config.enable_payload_size = 1;
+    g_feat_config.enable_payload_content = 1;
+    g_feat_config.enable_payload_hist = 1;
+    g_feat_config.enable_payload_magic = 1;
     g_feat_config.enable_payload_stats = 1;
+
+    // 序列模块
+    g_feat_config.enable_sequence_stats = 1;
+    g_feat_config.enable_raw_sequences = 1;
+    g_feat_config.enable_chunk_sequences = 1;
+    g_feat_config.enable_rate_sequences = 1;
+
+    // FFT 模块
+    g_feat_config.enable_fft_global = 1;
+    g_feat_config.enable_fft_fwd = 1;
+    g_feat_config.enable_fft_bwd = 1;
+
+    // Window 模块
+    g_feat_config.enable_window_pkt = 1;
+    g_feat_config.enable_window_byte = 1;
+
+    // Behavior 模块
+    g_feat_config.enable_behavior_basic = 1;
+    g_feat_config.enable_behavior_pattern = 1;
+    g_feat_config.enable_behavior_bitrate = 1;
 
     return 0;
 }
@@ -258,27 +305,183 @@ int feat_config_read(const char* filename)
             "Kafka topic handle created, topic=%s (this does not guarantee broker topic exists)", g_feat_config.topic_name);
     }
 
-    // 输出配置
-    MESA_load_profile_uint_def(filename, "OUTPUT", "output_raw_seq", &g_feat_config.output_raw_seq, 1);
-
-    // 特征模块开关
+    // 特征模块总开关
     MESA_load_profile_uint_def(filename, "FEATURES", "enable_basic", &g_feat_config.enable_basic, 1);
     MESA_load_profile_uint_def(filename, "FEATURES", "enable_iat", &g_feat_config.enable_iat, 1);
-    MESA_load_profile_uint_def(filename, "FEATURES", "enable_burst", &g_feat_config.enable_burst, 1);
+    // enable_burst 在下方子开关中加载
     MESA_load_profile_uint_def(filename, "FEATURES", "enable_protocol", &g_feat_config.enable_protocol, 1);
     MESA_load_profile_uint_def(filename, "FEATURES", "enable_payload", &g_feat_config.enable_payload, 1);
     MESA_load_profile_uint_def(filename, "FEATURES", "enable_sequence", &g_feat_config.enable_sequence, 1);
     MESA_load_profile_uint_def(filename, "FEATURES", "enable_fft", &g_feat_config.enable_fft, 1);
     MESA_load_profile_uint_def(filename, "FEATURES", "enable_window", &g_feat_config.enable_window, 1);
     MESA_load_profile_uint_def(filename, "FEATURES", "enable_behavior", &g_feat_config.enable_behavior, 1);
+
+    // 特征模块子开关
+
+    // 基础模块
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_basic_ratios", &g_feat_config.enable_basic_ratios, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_basic_payload_dir", &g_feat_config.enable_basic_payload_dir, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_basic_first_n", &g_feat_config.enable_basic_first_n, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_basic_pkt_length", &g_feat_config.enable_basic_pkt_length, 1);
+
+    // IAT 模块
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_iat_stats", &g_feat_config.enable_iat_stats, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_iat_fwd_bwd", &g_feat_config.enable_iat_fwd_bwd, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_iat_active", &g_feat_config.enable_iat_active, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_iat_response", &g_feat_config.enable_iat_response, 1);
+
+    // Burst 模块
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_burst", &g_feat_config.enable_burst, 1);
+
+    // 协议模块
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_protocol_tcp_flags", &g_feat_config.enable_protocol_tcp_flags, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_protocol_tcp_window", &g_feat_config.enable_protocol_tcp_window, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_protocol_ip", &g_feat_config.enable_protocol_ip, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_protocol_udp", &g_feat_config.enable_protocol_udp, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_protocol_port", &g_feat_config.enable_protocol_port, 1);
+
+    // Payload 模块
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_payload_size", &g_feat_config.enable_payload_size, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_payload_content", &g_feat_config.enable_payload_content, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_payload_hist", &g_feat_config.enable_payload_hist, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_payload_magic", &g_feat_config.enable_payload_magic, 1);
     MESA_load_profile_uint_def(filename, "FEATURES", "enable_payload_stats", &g_feat_config.enable_payload_stats, 1);
 
+    // 序列模块
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_sequence_stats", &g_feat_config.enable_sequence_stats, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_raw_sequences", &g_feat_config.enable_raw_sequences, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_chunk_sequences", &g_feat_config.enable_chunk_sequences, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_rate_sequences", &g_feat_config.enable_rate_sequences, 1);
+
+    // FFT 模块
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_fft_global", &g_feat_config.enable_fft_global, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_fft_fwd", &g_feat_config.enable_fft_fwd, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_fft_bwd", &g_feat_config.enable_fft_bwd, 1);
+
+    // Window 模块
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_window_pkt", &g_feat_config.enable_window_pkt, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_window_byte", &g_feat_config.enable_window_byte, 1);
+
+    // Behavior 模块
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_behavior_basic", &g_feat_config.enable_behavior_basic, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_behavior_pattern", &g_feat_config.enable_behavior_pattern, 1);
+    MESA_load_profile_uint_def(filename, "FEATURES", "enable_behavior_bitrate", &g_feat_config.enable_behavior_bitrate, 1);
+
+    // ============================================================================
+    // 计算复合依赖标志（由多个子开关聚合，用于 per-packet 阶段跳过不需要的数据采集）
+    // ============================================================================
+    g_feat_config.need_pkt_len_seq = g_feat_config.enable_fft_global ||
+        g_feat_config.enable_sequence_stats || g_feat_config.enable_raw_sequences ||
+        g_feat_config.enable_chunk_sequences || g_feat_config.enable_rate_sequences;
+
+    g_feat_config.need_dir_seq = g_feat_config.enable_sequence_stats ||
+        g_feat_config.enable_raw_sequences || g_feat_config.enable_chunk_sequences ||
+        g_feat_config.enable_rate_sequences;
+
+    g_feat_config.need_ts_seq = g_feat_config.enable_chunk_sequences ||
+        g_feat_config.enable_rate_sequences;
+
+    g_feat_config.need_l3_l4_payload_seq = g_feat_config.enable_raw_sequences;
+
+    g_feat_config.need_fwd_bwd_pkt_lens = g_feat_config.enable_basic_pkt_length ||
+        g_feat_config.enable_fft_fwd || g_feat_config.enable_fft_bwd;
+
+    g_feat_config.need_first_n = g_feat_config.enable_basic &&
+        g_feat_config.enable_basic_first_n;
+
+    g_feat_config.need_payload_dir = g_feat_config.enable_basic &&
+        g_feat_config.enable_basic_payload_dir;
+
+    g_feat_config.need_fwd_bwd_iats = g_feat_config.enable_iat &&
+        g_feat_config.enable_iat_fwd_bwd;
+
+    g_feat_config.need_window_update = g_feat_config.enable_window_pkt ||
+        g_feat_config.enable_window_byte || g_feat_config.enable_behavior_pattern ||
+        g_feat_config.enable_behavior_bitrate;
+
+    g_feat_config.need_iat_seq = g_feat_config.enable_iat_stats ||
+        g_feat_config.enable_sequence_stats || g_feat_config.enable_raw_sequences;
+
+    // 依赖校验：子开关被主开关覆盖时打印 WARNING
+    if (!g_feat_config.enable_basic) {
+        if (g_feat_config.enable_basic_ratios || g_feat_config.enable_basic_payload_dir ||
+            g_feat_config.enable_basic_first_n || g_feat_config.enable_basic_pkt_length) {
+            MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_FATAL, TI_FEATURES,
+                "WARNING: enable_basic=0 but sub-switches are ON, sub-switches will be ignored");
+        }
+    }
+    if (!g_feat_config.enable_iat) {
+        if (g_feat_config.enable_iat_stats || g_feat_config.enable_iat_fwd_bwd ||
+            g_feat_config.enable_iat_active || g_feat_config.enable_iat_response) {
+            MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_FATAL, TI_FEATURES,
+                "WARNING: enable_iat=0 but sub-switches are ON, sub-switches will be ignored");
+        }
+    }
+    if (!g_feat_config.enable_protocol) {
+        if (g_feat_config.enable_protocol_tcp_flags || g_feat_config.enable_protocol_tcp_window ||
+            g_feat_config.enable_protocol_ip || g_feat_config.enable_protocol_udp ||
+            g_feat_config.enable_protocol_port) {
+            MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_FATAL, TI_FEATURES,
+                "WARNING: enable_protocol=0 but sub-switches are ON, sub-switches will be ignored");
+        }
+    }
+    if (!g_feat_config.enable_payload) {
+        if (g_feat_config.enable_payload_size || g_feat_config.enable_payload_content ||
+            g_feat_config.enable_payload_hist || g_feat_config.enable_payload_magic ||
+            g_feat_config.enable_payload_stats) {
+            MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_FATAL, TI_FEATURES,
+                "WARNING: enable_payload=0 but sub-switches are ON, sub-switches will be ignored");
+        }
+    }
+    if (!g_feat_config.enable_sequence) {
+        if (g_feat_config.enable_sequence_stats || g_feat_config.enable_raw_sequences ||
+            g_feat_config.enable_chunk_sequences || g_feat_config.enable_rate_sequences) {
+            MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_FATAL, TI_FEATURES,
+                "WARNING: enable_sequence=0 but sub-switches are ON, sub-switches will be ignored");
+        }
+    }
+    if (!g_feat_config.enable_fft) {
+        if (g_feat_config.enable_fft_global || g_feat_config.enable_fft_fwd || g_feat_config.enable_fft_bwd) {
+            MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_FATAL, TI_FEATURES,
+                "WARNING: enable_fft=0 but sub-switches are ON, sub-switches will be ignored");
+        }
+    }
+
     MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_INFO, TI_FEATURES,
-        "Feature modules: basic=%u iat=%u burst=%u protocol=%u payload=%u sequence=%u fft=%u window=%u behavior=%u payload_stats=%u",
+        "Feature master switches: basic=%u iat=%u burst=%u protocol=%u payload=%u sequence=%u fft=%u window=%u behavior=%u",
         g_feat_config.enable_basic, g_feat_config.enable_iat, g_feat_config.enable_burst,
         g_feat_config.enable_protocol, g_feat_config.enable_payload, g_feat_config.enable_sequence,
-        g_feat_config.enable_fft, g_feat_config.enable_window, g_feat_config.enable_behavior,
-        g_feat_config.enable_payload_stats);
+        g_feat_config.enable_fft, g_feat_config.enable_window, g_feat_config.enable_behavior);
+
+    MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_INFO, TI_FEATURES,
+        "Feature modules: basic(%u/%u/%u/%u) iat(%u/%u/%u/%u) burst=%u protocol(%u/%u/%u/%u/%u) payload(%u/%u/%u/%u/%u) sequence(%u/%u/%u/%u) fft(%u/%u/%u) window(%u/%u) behavior(%u/%u/%u)",
+        g_feat_config.enable_basic_ratios, g_feat_config.enable_basic_payload_dir,
+        g_feat_config.enable_basic_first_n, g_feat_config.enable_basic_pkt_length,
+        g_feat_config.enable_iat_stats, g_feat_config.enable_iat_fwd_bwd,
+        g_feat_config.enable_iat_active, g_feat_config.enable_iat_response,
+        g_feat_config.enable_burst,
+        g_feat_config.enable_protocol_tcp_flags, g_feat_config.enable_protocol_tcp_window,
+        g_feat_config.enable_protocol_ip, g_feat_config.enable_protocol_udp,
+        g_feat_config.enable_protocol_port,
+        g_feat_config.enable_payload_size, g_feat_config.enable_payload_content,
+        g_feat_config.enable_payload_hist, g_feat_config.enable_payload_magic,
+        g_feat_config.enable_payload_stats,
+        g_feat_config.enable_sequence_stats, g_feat_config.enable_raw_sequences,
+        g_feat_config.enable_chunk_sequences, g_feat_config.enable_rate_sequences,
+        g_feat_config.enable_fft_global, g_feat_config.enable_fft_fwd,
+        g_feat_config.enable_fft_bwd,
+        g_feat_config.enable_window_pkt, g_feat_config.enable_window_byte,
+        g_feat_config.enable_behavior_basic, g_feat_config.enable_behavior_pattern,
+        g_feat_config.enable_behavior_bitrate);
+
+    MESA_handle_runtime_log(g_feat_config.log_handle, RLOG_LV_INFO, TI_FEATURES,
+        "Compound dependency flags: pkt_len_seq=%u dir_seq=%u ts_seq=%u l3_l4_payload_seq=%u "
+        "fwd_bwd_pkt_lens=%u first_n=%u payload_dir=%u fwd_bwd_iats=%u window_update=%u iat_seq=%u",
+        g_feat_config.need_pkt_len_seq, g_feat_config.need_dir_seq,
+        g_feat_config.need_ts_seq, g_feat_config.need_l3_l4_payload_seq,
+        g_feat_config.need_fwd_bwd_pkt_lens, g_feat_config.need_first_n,
+        g_feat_config.need_payload_dir, g_feat_config.need_fwd_bwd_iats,
+        g_feat_config.need_window_update, g_feat_config.need_iat_seq);
 
     return 0;
 }

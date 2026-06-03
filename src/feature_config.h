@@ -58,22 +58,81 @@ typedef struct _ti_feature_config
     int sni_bridge_id;
     char sni_bridge_name[MAX_DOMAIN_LEN];
 
-    // 输出原始序列标志
-    unsigned int output_raw_seq;
+    // 特征模块总开关 (0=关闭, 1=开启, 默认全部开启)
+    unsigned int enable_basic;               // 基础模块
+    unsigned int enable_iat;                 // IAT 模块
+    // enable_burst 已在下方定义
+    unsigned int enable_protocol;            // 协议模块
+    unsigned int enable_payload;             // Payload 模块
+    unsigned int enable_sequence;            // 序列模块
+    unsigned int enable_fft;                 // FFT 频域模块
+    unsigned int enable_window;              // 窗口模块
+    unsigned int enable_behavior;            // 行为模块
 
-    // 特征模块开关 (0=关闭, 1=开启, 默认全部开启)
-    unsigned int enable_basic;         // 基础计数+包长
-    unsigned int enable_iat;           // 到达间隔
-    unsigned int enable_burst;         // 突发检测
-    unsigned int enable_protocol;      // 协议头
-    unsigned int enable_payload;       // 载荷分析
-    unsigned int enable_sequence;      // 序列特征
-    unsigned int enable_fft;           // 频域特征
-    unsigned int enable_window;        // 时间窗
-    unsigned int enable_behavior;      // 行为特征
+    // 特征模块子开关 (0=关闭, 1=开启, 默认全部开启)
 
-    // 每包阶段子开关
-    unsigned int enable_payload_stats; // 每包熵/压缩率计算 (关闭可大幅提升性能)
+    // 基础模块子开关
+    unsigned int enable_basic_ratios;        // 基础比率 (fwd/bwd 比、平均包长)
+    unsigned int enable_basic_payload_dir;   // 前/后向 payload 统计
+    unsigned int enable_basic_first_n;       // 前 N 包长度统计
+    unsigned int enable_basic_pkt_length;    // 包长统计 (方向包长、分位数)
+
+    // IAT 模块子开关
+    unsigned int enable_iat_stats;           // IAT 基本统计 + 熵/自相关 + 序列统计
+    unsigned int enable_iat_fwd_bwd;         // 前向/后向 IAT 统计
+    unsigned int enable_iat_active;          // 活跃/空闲时间
+    unsigned int enable_iat_response;        // 响应延迟统计
+
+    // Burst 模块 (保持不变)
+    unsigned int enable_burst;               // 突发检测
+
+    // 协议模块子开关
+    unsigned int enable_protocol_tcp_flags;  // TCP 标志统计
+    unsigned int enable_protocol_tcp_window; // TCP 窗口统计
+    unsigned int enable_protocol_ip;         // IP TTL/ToS 统计
+    unsigned int enable_protocol_udp;        // UDP 长度统计
+    unsigned int enable_protocol_port;       // 端口/IP 特征 + 历史兼容
+
+    // Payload 模块子开关
+    unsigned int enable_payload_size;        // 载荷大小统计
+    unsigned int enable_payload_content;     // 内容特征 (可打印比、字母数字比)
+    unsigned int enable_payload_hist;        // 字节直方图 + 字节统计
+    unsigned int enable_payload_magic;       // 魔数/协议检测
+    unsigned int enable_payload_stats;       // 每包高级统计 (熵/压缩率)
+
+    // 序列模块子开关
+    unsigned int enable_sequence_stats;      // 序列统计特征 (自相关、游程、熵等)
+    unsigned int enable_raw_sequences;       // 原始序列输出 (length/iat/dir/composite)
+    unsigned int enable_chunk_sequences;     // chunk 序列输出
+    unsigned int enable_rate_sequences;      // 速率序列输出
+
+    // FFT 模块子开关
+    unsigned int enable_fft_global;          // 全局 FFT 特征
+    unsigned int enable_fft_fwd;             // 前向 FFT 特征
+    unsigned int enable_fft_bwd;             // 后向 FFT 特征
+
+    // Window 模块子开关
+    unsigned int enable_window_pkt;          // 窗口包数统计
+    unsigned int enable_window_byte;         // 窗口字节数统计
+
+    // Behavior 模块子开关
+    unsigned int enable_behavior_basic;      // 基础行为 (持续时间、比特率)
+    unsigned int enable_behavior_pattern;    // 流模式 (短连接、不对称比)
+    unsigned int enable_behavior_bitrate;    // 瞬时比特率统计
+
+    // === 复合依赖标志（自动计算，非用户配置）===
+    // 以下标志由多个子开关聚合而成，在 feat_config_read() 末尾自动计算。
+    // 用于 per-packet 阶段跳过不需要的数据采集，节省 CPU 开销。
+    unsigned int need_pkt_len_seq;           // 需要 pkt_len_seq: fft_global | sequence_stats | raw_seq | chunk_seq | rate_seq
+    unsigned int need_dir_seq;               // 需要 dir_seq: sequence_stats | raw_seq | chunk_seq | rate_seq
+    unsigned int need_ts_seq;                // 需要 ts_seq: chunk_seq | rate_seq
+    unsigned int need_l3_l4_payload_seq;     // 需要 l3/l4/payload_len_seq: raw_sequences
+    unsigned int need_fwd_bwd_pkt_lens;      // 需要 fwd_pkt_lens/bwd_pkt_lens: basic_pkt_length | fft_fwd | fft_bwd
+    unsigned int need_first_n;               // 需要 first_n_lens 采集: enable_basic && enable_basic_first_n
+    unsigned int need_payload_dir;           // 需要 payload dir 采集: enable_basic && enable_basic_payload_dir
+    unsigned int need_fwd_bwd_iats;          // 需要 fwd/bwd IAT 数组: enable_iat && enable_iat_fwd_bwd
+    unsigned int need_window_update;         // 需要 window_update: window_pkt | window_byte | behavior_pattern | behavior_bitrate
+    unsigned int need_iat_seq;               // 需要 iat_seq: iat_stats | sequence_stats | raw_sequences
 
 } ti_feature_config_t;
 
